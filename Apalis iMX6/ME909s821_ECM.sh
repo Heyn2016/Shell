@@ -61,6 +61,9 @@ done
 
 if [ "$netmode" == "4G" ];then
     echo Start LTE connection...
+    # HUAWEI ME909s Series LTE Module
+    # Do not blink. (default value)
+    echo -e "AT^LEDCTRL=1\r\n" > /dev/ttyUSB0
     echo -e "AT^NDISDUP=1,1\r\n" > /dev/ttyUSB0
     udhcpc -i $ltemodulename
 else
