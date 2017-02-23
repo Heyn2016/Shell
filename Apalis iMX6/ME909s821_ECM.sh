@@ -5,6 +5,16 @@
 #
 # History:  2017/02/22 V1.0.1[Heyn]
 #
+# /etc/systemd/system/network-lte.service
+#
+# [Unit]
+# Description=HUAWEI ME909s-821
+# After=multi-user.target
+# [Service]
+# Type=simple
+# ExecStart=/etc/lte.sh
+# [Install]
+# WantedBy=multi-user.target
 #--------------------------------------------
 
 #--------------------------------------------
