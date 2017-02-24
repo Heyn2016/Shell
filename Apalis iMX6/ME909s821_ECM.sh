@@ -11,10 +11,28 @@
 # Description=HUAWEI ME909s-821
 # After=multi-user.target
 # [Service]
-# Type=simple
+# Type=oneshot  #Similar to simple, but only once, Systemd will wait for it to finish before starting other services
 # ExecStart=/etc/lte.sh
 # [Install]
 # WantedBy=multi-user.target
+#
+# <yours.service starts after network-lte.service>
+#
+# /etc/systemd/system/yours.service
+# [Unit]
+# Description=My Application for Python3.5.2
+# After=multi-user.target network-lte.service
+# [Service]
+# Type=simple   #The ExecStart field starts the process as the main process
+# ExecStart=/usr/bin/python /home/root/main.py &
+# [Install]
+# WantedBy=multi-user.target
+#
+#
+# <Linux's command for start services>
+#systemctl enable network-lte.service
+#systemctl enable yours.service
+#
 #--------------------------------------------
 
 #--------------------------------------------
