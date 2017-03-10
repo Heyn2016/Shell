@@ -129,6 +129,14 @@ echo -e "AT^LEDCTRL=1\r\n" > /dev/ttyUSB0
 
 #--------------------------------------------
 # Detect SIM Card <Method 2nd>
+#
+# AT^SYSINFOEX?
+# ^SYSINFOEX: 1,0,0,4,,3,"WCDMA",41,"WCDMA
+#   1 Restricted services
+#   0 No services
+#   0 Not roaming
+#   4 Invalid SIM card in PS and CS
+#   3 WCDMA
 #--------------------------------------------
 
 # echo -e "AT^SYSINFOEX\r\n" > /dev/ttyUSB0
