@@ -153,26 +153,26 @@ echo -e "AT^LEDCTRL=1\r\n" > /dev/ttyUSB0
 #     fi
 # done < /dev/ttyUSB0
 
-echo -e "AT^SYSINFOEX\r\n" > /dev/ttyUSB0
-while read lines
-do
-    if [[ "$lines" == *"^SYSINFOEX:"* ]];then
-        res=$(echo $lines | awk '{print $2}' | awk -F[','] '{print $4}')
-        # <sim_state>: indicates the state of the SIM card.
-        if [ "$res" == "1" ];then
-            break
-        elif [ "$res" == "255" ];then
-            echo SIM card not detected. $lines >> $logfile
-            exit 0
-        fi
-    else
-        n=$(($n + 1))
-        if [ "$n" -gt 100 ];then
-            echo SIM card not detected and timeout. $lines >> $logfile
-            exit 0
-        fi
-    fi
-done < /dev/ttyUSB0
+# echo -e "AT^SYSINFOEX\r\n" > /dev/ttyUSB0
+# while read lines
+# do
+#     if [[ "$lines" == *"^SYSINFOEX:"* ]];then
+#         res=$(echo $lines | awk '{print $2}' | awk -F[','] '{print $4}')
+#         # <sim_state>: indicates the state of the SIM card.
+#         if [ "$res" == "1" ];then
+#             break
+#         elif [ "$res" == "255" ];then
+#             echo SIM card not detected. $lines >> $logfile
+#             exit 0
+#         fi
+#     else
+#         n=$(($n + 1))
+#         if [ "$n" -gt 100 ];then
+#             echo SIM card not detected and timeout. $lines >> $logfile
+#             exit 0
+#         fi
+#     fi
+# done < /dev/ttyUSB0
 
 #--------------------------------------------
 # Query the Connection Status
@@ -204,16 +204,16 @@ echo Start LTE connection...
 echo -e "AT\r\n" > /dev/ttyUSB0
 echo -e "AT^NDISDUP=1,1\r\n" > /dev/ttyUSB0
 
-while read lines
-do
-    if [[ "$lines" == *"ERROR"* ]];then
-        echo Start LTE Internet mode is $lines >> $logfile
-        exit 0
-    elif [[ "$lines" == *"OK"* ]];then
-        echo Start LTE Internet mode is $lines >> $logfile
-        break;
-    fi
-done < /dev/ttyUSB0
+# while read lines
+# do
+#     if [[ "$lines" == *"ERROR"* ]];then
+#         echo Start LTE Internet mode is $lines >> $logfile
+#         exit 0
+#     elif [[ "$lines" == *"OK"* ]];then
+#         echo Start LTE Internet mode is $lines >> $logfile
+#         break;
+#     fi
+# done < /dev/ttyUSB0
 
 #--------------------------------------------
 # Query the Connection Status
@@ -275,4 +275,29 @@ do
     fi
 done
 
+# TimeSyncd Server
+time1google="216.239.35.0"
+time2google="216.239.35.4"
+time3google="216.239.35.8"
+time4google="216.239.35.12"
+
+if [ "$(route -n | grep $time1google)" == "" ];then
+    echo Synchronized to timeserver = $time1google >> $logfile
+    route add -net $time1google netmask 255.255.255.255 dev $ltemodulename
+fi
+
+if [ "$(route -n | grep $time2google)" == "" ];then
+    echo Synchronized to timeserver = $time2google >> $logfile
+    route add -net $time2google netmask 255.255.255.255 dev $ltemodulename
+fi
+
+if [ "$(route -n | grep $time3google)" == "" ];then
+    echo Synchronized to timeserver = $time3google >> $logfile
+    route add -net $time3google netmask 255.255.255.255 dev $ltemodulename
+fi
+
+if [ "$(route -n | grep $time4google)" == "" ];then
+    echo Synchronized to timeserver = $time4google >> $logfile
+    route add -net $time4google netmask 255.255.255.255 dev $ltemodulename
+fi
 
