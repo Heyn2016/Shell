@@ -1,9 +1,0 @@
-[Unit]
-Description=Pbox Daemon Shell
-After=multi-user.target network-lte.service
- 
-[Service]
-Type=simple
-ExecStart=/home/pbox_daemon.sh
-[Install]
-WantedBy=multi-user.target
