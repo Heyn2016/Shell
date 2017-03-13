@@ -4,6 +4,7 @@
 # Author:   Heyn
 #
 # History:  2017/03/10 V1.0.0[Heyn]
+#           2017/03/13 V1.0.1[Heyn] Add shell input parameter function
 #
 # systemctl status pboxScript
 #--------------------------------------------
@@ -14,16 +15,23 @@ array_ip=("192.168.5.1" "47.93.79.77")
 # User config start
 #--------------------------------------------
 
-# confpath=/www/pages/htdocs/conf/AnyLink.xml
-confpath=/tmp/netmode
-logfile=/tmp/pbox_daemon.log
+logfile=/tmp/lte_daemon.log
+confpath=/tmp/pboxConfig
+
 
 if [ ! -f "$logfile" ]; then
-    echo `date '+%Y-%m-%d %H:%M:%S'` > $logfile
+    echo "PboxScript start." > $logfile
+    echo `date '+%Y-%m-%d %H:%M:%S'` >> $logfile
+fi
+
+if [ `expr match $1 "[S|s][T|t][O|o][P|p]$"` -ne 0 ]; then
+    echo -e "AT^NDISDUP=1,0\r\n" > /dev/ttyUSB0
+    echo 4G Status [Offline]: `date '+%Y-%m-%d %H:%M:%S'` >> $logfile
+    exit 0
 fi
 
 if [ ! -f "$confpath" ]; then
-    echo $confpath file is not exist. >> $logfile
+    echo $confpath file is not exist. > $logfile
     exit 0
 fi
 
@@ -32,57 +40,28 @@ fi
 #--------------------------------------------
 netmode="gateway"
 
-# while read lines
-# do
-#     item=`echo $lines | awk -F['>'] '/\<Mode\>/{print $2}' | awk -F['<'] '{print $1}'`
-#     if [ "$item" == "4G" ];then
-#         netmode=$item
-#         break
-#     elif [ "$item" == "gateway" ];then
-#         netmode=$item
-#         break
-#     fi
-# done < $confpath
-
 while read lines
 do
-    item=`echo $lines`
-    if [ "$item" == "4G" ];then
-        netmode=$item
-        break
-    elif [ "$item" == "gateway" ];then
-        netmode=$item
-        break
+    item=`echo $lines | awk -F['='] '{print $1}'`
+    if [ "$item" == "netmode" ];then
+        netmode=`echo $lines | awk -F['='] '{print $2}'`
+    elif [ "$item" == "cloudaddr" ];then
+        cloudaddr=`echo $lines | awk -F['='] '{print $2}'`
     fi
 done < $confpath
 
-# netmode="4G"
+
 if [ "$netmode" == "gateway" ];then
-    echo Wired connection... >> $logfile
+    echo Wired connection...
+    echo `systemctl stop cora.timer`
     exit 0
 fi
 
-# 1 packets transmitted, 1 packets received, 0% packet loss
-# 1 packets transmitted, 0 packets received, 100% packet loss
-
-# netstatus=0
-# for ip in ${array_ip[@]}
-# do
-#     ping=`ping -c 1 $ip|grep loss|awk '{print $7}'|awk -F "%" '{print $1}'`
-
-#     if [ $ping -eq 100  ];then
-#         # echo ping $ip fail
-#          netstatus=$[$netstatus-1]
-#     else
-#         # echo ping $ip ok
-#         netstatus=$[$netstatus+1]
-#     fi
-# done
-
-# if [ "$netstatus" == "${#array_ip[@]}" ];then
-#     echo Net Status is online...
+# if [ "$(echo `date '+%H%M'`)" -gt "0700" ]; then
+#     echo "Offline time. [0700 - 2359]" `date '+%Y-%m-%d %H:%M'`
 #     exit 0
 # fi
+
 
 #--------------------------------------------
 # Query the Connection Status
@@ -98,7 +77,6 @@ do
             echo Net Status is online...
             exit 0
         else
-            echo Disconnected Done
             break
         fi
     fi
@@ -142,11 +120,17 @@ do
     echo -e "AT^SYSINFOEX\r\n" > /dev/ttyUSB0
 done < /dev/ttyUSB0
 
-echo 4G Status [Offline]: `date '+%Y-%m-%d %H:%M:%S'` >> $logfile
-
-echo Start 4G connection... >> $logfile
+# echo Start 4G connection... >> $logfile
 echo -e "AT\r\n" > /dev/ttyUSB0
 echo -e "AT^NDISDUP=1,1\r\n" > /dev/ttyUSB0
 sleep 2s
 udhcpc -i usb0
+
+# Get cloud ip address
+if [ "$(route -n | grep $cloudaddr)" == "" ];then
+    # echo Cloud IP Address = $cloudaddr >> $logfile
+    route add -net $cloudaddr netmask 255.255.255.255 dev usb0
+fi
+
+echo 4G Status [Online]: `date '+%Y-%m-%d %H:%M:%S'` >> $logfile
 
