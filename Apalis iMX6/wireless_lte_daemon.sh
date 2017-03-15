@@ -132,5 +132,5 @@ if [ "$(route -n | grep $cloudaddr)" == "" ];then
     route add -net $cloudaddr netmask 255.255.255.255 dev usb0
 fi
 
-echo 4G Status [Online]: `date '+%Y-%m-%d %H:%M:%S'` >> $logfile
+echo 4G Status [Online ]: `date '+%Y-%m-%d %H:%M:%S'` >> $logfile
 
