@@ -5,6 +5,7 @@
 #
 # History:  2017/03/10 V1.0.0[Heyn]
 #           2017/03/13 V1.0.1[Heyn] Add shell input parameter function
+#           2017/03/16 V1.0.2[heyn] Release
 #
 # systemctl status pboxScript
 #--------------------------------------------
