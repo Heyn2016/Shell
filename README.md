@@ -39,7 +39,7 @@ $vim cora.timer
 Description=Runs Pbox Script every 2 min  
   
 [Timer]  
-OnBootSec=1min  
+OnBootSec=10s 
 OnUnitActiveSec=`2min`  
 Unit=`wireless_lte.service`  
   

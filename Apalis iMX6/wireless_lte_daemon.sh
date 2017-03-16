@@ -20,7 +20,6 @@ confpath=/tmp/pboxConfig
 
 
 if [ ! -f "$logfile" ]; then
-    echo "PboxScript start." > $logfile
     echo `date '+%Y-%m-%d %H:%M:%S'` >> $logfile
 fi
 
@@ -57,6 +56,7 @@ if [ "$netmode" == "gateway" ];then
     exit 0
 fi
 
+echo Wireless connection...
 # if [ "$(echo `date '+%H%M'`)" -gt "0700" ]; then
 #     echo "Offline time. [0700 - 2359]" `date '+%Y-%m-%d %H:%M'`
 #     exit 0
@@ -67,7 +67,7 @@ fi
 # Query the Connection Status
 #--------------------------------------------
 echo -e "AT\r\n" > /dev/ttyUSB0
-
+echo -e "AT^NDISSTATQRY?\r\n" > /dev/ttyUSB0
 # Response:^NDISSTATQRY: 0,,,"IPV4",0,,,"IPV6"
 while read lines
 do
@@ -80,7 +80,7 @@ do
             break
         fi
     fi
-    echo -e "AT^NDISSTATQRY?\r\n" > /dev/ttyUSB0
+    # echo -e "AT^NDISSTATQRY?\r\n" > /dev/ttyUSB0
 done < /dev/ttyUSB0
 #--------------------------------------------
 # Query the Connection Status Done
@@ -99,6 +99,7 @@ sysmode=("NO SERVICE" "GSM" "CDMA" "WCDMA" "TD-SCDMA" "WiMAX" "LTE")
 
 # [ERROR] ^SYSINFOEX: 1,0,0,4,,3,"WCDMA",41,"WCDMA  
 echo -e "AT\r\n" > /dev/ttyUSB0
+echo -e "AT^SYSINFOEX\r\n" > /dev/ttyUSB0
 while read lines
 do
     if [[ "$lines" == *"^SYSINFOEX:"* ]];then
@@ -117,13 +118,15 @@ do
 
         break 
     fi
-    echo -e "AT^SYSINFOEX\r\n" > /dev/ttyUSB0
+    
 done < /dev/ttyUSB0
 
 # echo Start 4G connection... >> $logfile
 echo -e "AT\r\n" > /dev/ttyUSB0
 echo -e "AT^NDISDUP=1,1\r\n" > /dev/ttyUSB0
 sleep 2s
+
+# udhcpc -R -n -A 15 -i usb0
 udhcpc -i usb0
 
 # Get cloud ip address

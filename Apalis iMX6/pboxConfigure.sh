@@ -68,7 +68,7 @@ do
     cloudaddr=`echo $line | awk -F['<'] '{print $1}'`
 done
 
-# Debug
+# Debug Mode
 #netmode="4G"
 
 echo "netmode="$netmode     >   $confpath
