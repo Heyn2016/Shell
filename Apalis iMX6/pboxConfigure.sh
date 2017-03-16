@@ -39,9 +39,11 @@ do
     item=`echo $lines | awk -F['>'] '/\<Mode\>/{print $2}' | awk -F['<'] '{print $1}'`
     if [ "$item" == "4G" ];then
         netmode=$item
+        echo -e "AT^LEDCTRL=1\r\n" > /dev/ttyUSB0
         break
     elif [ "$item" == "gateway" ];then
         netmode=$item
+        echo -e "AT^LEDCTRL=0\r\n" > /dev/ttyUSB0
         break
     fi
 done<$webpath

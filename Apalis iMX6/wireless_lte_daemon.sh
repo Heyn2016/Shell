@@ -81,12 +81,12 @@ do
             break
         fi
     fi
-    # echo -e "AT^NDISSTATQRY?\r\n" > /dev/ttyUSB0
+    echo -e "AT^NDISSTATQRY?\r\n" > /dev/ttyUSB0
 done < /dev/ttyUSB0
 #--------------------------------------------
 # Query the Connection Status Done
 #--------------------------------------------
-
+echo Start Detect SIM Card...
 #--------------------------------------------
 # Detect SIM Card
 #--------------------------------------------
@@ -119,10 +119,10 @@ do
 
         break 
     fi
-    
+    echo -e "AT^SYSINFOEX\r\n" > /dev/ttyUSB0
 done < /dev/ttyUSB0
 
-# echo Start 4G connection... >> $logfile
+echo Start 4G connection...
 echo -e "AT\r\n" > /dev/ttyUSB0
 echo -e "AT^NDISDUP=1,1\r\n" > /dev/ttyUSB0
 sleep 2s
