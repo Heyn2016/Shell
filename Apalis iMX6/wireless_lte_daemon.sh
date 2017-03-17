@@ -6,6 +6,7 @@
 # History:  2017/03/10 V1.0.0[Heyn]
 #           2017/03/13 V1.0.1[Heyn] Add shell input parameter function
 #           2017/03/16 V1.0.2[heyn] Release
+#           2017/03/17 V1.1.0[heyn] stty -F /dev/ttyUSB0 raw speed 9600 min 0 time 10
 #
 # systemctl status pboxScript
 #--------------------------------------------
@@ -58,35 +59,80 @@ if [ "$netmode" == "gateway" ];then
 fi
 
 echo Wireless connection...
+
 # if [ "$(echo `date '+%H%M'`)" -gt "0700" ]; then
 #     echo "Offline time. [0700 - 2359]" `date '+%Y-%m-%d %H:%M'`
 #     exit 0
 # fi
 
+stty -F /dev/ttyUSB0 raw speed 9600 min 0 time 10
+
+echo Check HUAWEI module status...
+echo -e "AT\r\n" > /dev/ttyUSB0
 
 #--------------------------------------------
 # Query the Connection Status
-#--------------------------------------------
-echo -e "AT\r\n" > /dev/ttyUSB0
-echo -e "AT^NDISSTATQRY?\r\n" > /dev/ttyUSB0
 # Response:^NDISSTATQRY: 0,,,"IPV4",0,,,"IPV6"
+#--------------------------------------------
+echo Start query connection status...
+echo -e "AT^NDISSTATQRY?\r\n" > /dev/ttyUSB0
+cat /dev/ttyUSB0 > /tmp/huawei
+
 while read lines
 do
     if [[ "$lines" == *"^NDISSTATQRY:"* ]];then
         res=$(echo $lines | awk '{print $2}' | awk -F[','] '{print $1}')
         if [ "$res" == "1" ];then
-            echo Net Status is online...
+            echo Net status is online...
             exit 0
         else
             break
         fi
     fi
-    echo -e "AT^NDISSTATQRY?\r\n" > /dev/ttyUSB0
-done < /dev/ttyUSB0
+done < /tmp/huawei
+
 #--------------------------------------------
 # Query the Connection Status Done
 #--------------------------------------------
-echo Start Detect SIM Card...
+
+
+#--------------------------------------------
+# Query Domain Registration Status
+#--------------------------------------------
+cgreg_status=(  "Not registered, MT is not currently searching for a new operator to register with." 
+                "Registered, home network" 
+                "Not registered, but MT is currently searching a new operator to register with." 
+                "Registration denied" 
+                "Unknown" 
+                "Registered, roaming" 
+            )
+
+echo Start domain registration status...
+echo -e "AT\r\n" > /dev/ttyUSB0
+echo -e "AT+CGREG?\r\n" > /dev/ttyUSB0
+cat /dev/ttyUSB0 > /tmp/huawei
+# Response : +CGREG: 0,1
+while read lines
+do
+    if [[ "$lines" == *"CGREG"* ]];then
+        res=$(echo $lines | awk '{print $2}' | awk -F[','] '{print $2}')
+        
+        if [ "$res" == "1" ] || [ "$res" == "5" ];then
+            echo $lines
+            echo ${cgreg_status[$res]}
+            break
+        elif [ "$res" == "0" ] || [ "$res" == "2" ] || [ "$res" == "3" ];then
+            echo ${cgreg_status[$res]} >> $logfile
+            sleep 1s
+        else
+            # cgreg_status = Unknown
+            echo Unknown >> $logfile
+            exit 1
+        fi
+    fi
+done < /tmp/huawei
+
+
 #--------------------------------------------
 # Detect SIM Card
 #--------------------------------------------
@@ -99,8 +145,11 @@ lock_state=("SIM card is not locked by the CardLock feature." "SIM card is locke
 sysmode=("NO SERVICE" "GSM" "CDMA" "WCDMA" "TD-SCDMA" "WiMAX" "LTE")
 
 # [ERROR] ^SYSINFOEX: 1,0,0,4,,3,"WCDMA",41,"WCDMA  
-echo -e "AT\r\n" > /dev/ttyUSB0
+echo Start detect SIM card...
+
 echo -e "AT^SYSINFOEX\r\n" > /dev/ttyUSB0
+cat /dev/ttyUSB0 > /tmp/huawei
+
 while read lines
 do
     if [[ "$lines" == *"^SYSINFOEX:"* ]];then
@@ -119,16 +168,18 @@ do
 
         break 
     fi
-    echo -e "AT^SYSINFOEX\r\n" > /dev/ttyUSB0
-done < /dev/ttyUSB0
+done < /tmp/huawei
+
 
 echo Start 4G connection...
+
 echo -e "AT\r\n" > /dev/ttyUSB0
 echo -e "AT^NDISDUP=1,1\r\n" > /dev/ttyUSB0
 sleep 2s
 
 # udhcpc -R -n -A 15 -i usb0
-udhcpc -i usb0
+udhcpc -n -i usb0
+
 
 # Get cloud ip address
 if [ "$(route -n | grep $cloudaddr)" == "" ];then
@@ -138,3 +189,16 @@ fi
 
 echo 4G Status [Online ]: `date '+%Y-%m-%d %H:%M:%S'` >> $logfile
 
+# PID=`ps -ef | grep -v grep | grep "cat" | grep "ttyUSB0" | awk '{ print $2; exit }'`
+
+# if test $PID; then
+#         kill -KILL $PID
+
+#         if [ ! "$?" = "0" ]; then
+#                 echo "ERROR: Terminated failed"
+#                 exit 3
+#         fi
+
+#         echo "link terminated"
+#         exit 0
+# fi

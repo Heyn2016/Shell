@@ -7,7 +7,7 @@ $
   
 #### [2] Configure service
   
-$vim configure.service 
+`$vim configure.service` 
 [Unit]  
 Description=Pbox configure service.  
 After=multi-user.target  
@@ -20,7 +20,7 @@ WantedBy=multi-user.target
   
 #### [3] pbox_daemon
   
-$vim wireless_lte.service  
+`$vim wireless_lte.service`  
   
 [Unit]  
 Description=Pbox LTE(4G) Daemon Shell  
@@ -28,12 +28,12 @@ After=multi-user.target `configure.service`
   
 [Service]  
 Type=`simple`  
-ExecStart=/home/wireless_lte_daemon.sh  
+ExecStart=/home/wireless_lte_daemon.sh  start  
 [Install]  
 WantedBy=multi-user.target  
   
-$systemctl enable wireless_lte.service  
-$vim cora.timer  
+`$systemctl enable wireless_lte.service`  
+`$vim cora.timer`  
   
 [Unit]  
 Description=Runs Pbox Script every 2 min  
@@ -48,3 +48,17 @@ WantedBy=multi-user.target
   
 $systemctl enable cora.timer  
 $systemctl start cora.timer  
+  
+`$vim huawei-off.service`  
+[Unit]  
+Description=Pbox LTE(4G) Shutdown  
+Before=shutdown.target reboot.target halt.target  
+DefaultDependencies=no  
+  
+[Service]  
+Type=oneshot  
+RemainAfterExit=yes  
+ExecStart=/etc/wireless_lte_daemon.sh stop  
+[Install]  
+WantedBy=reboot.target  
+  
