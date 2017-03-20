@@ -5,6 +5,7 @@
 #
 # History:  2017/02/22 V1.0.1[Heyn]
 #           2017/03/17 V1.1.0[Heyn] New add AT commands
+#           2017/03/20 V1.1.1[heyn] Offline 4G & Get cloud ip address
 #
 #--------------------------------------------
 
@@ -32,7 +33,7 @@ if [ ! -f "$webpath" ]; then
 fi
 
 #--------------------------------------------
-# Get network mode
+# Get network mode & Get cloud ip address
 #--------------------------------------------
 
 while read lines
@@ -40,10 +41,13 @@ do
     item=`echo $lines | awk -F['>'] '/\<Mode\>/{print $2}' | awk -F['<'] '{print $1}'`
     if [ "$item" == "4G" ];then
         netmode=$item
-        break
     elif [ "$item" == "gateway" ];then
         netmode=$item
-        break
+    fi
+    # New 2017-03-20 [Get cloud ip address]
+    item=`echo $lines | awk -F['>'] '/\<CloudInfo\>/{print $3}' | awk -F['<'] '{print $1}'`
+    if [ -n "$item" ];then
+        cloudaddr=$item
     fi
 done<$webpath
 
@@ -62,12 +66,17 @@ done
 
 #--------------------------------------------
 # Get cloud ip address
+# Delete 2017-03-20
 #--------------------------------------------
-cat $webpath |awk -F['>'] '/\<CloudInfo\>/{print $3}'|while read line
 
-do
-    cloudaddr=`echo $line | awk -F['<'] '{print $1}'`
-done
+# while read lines
+# do
+#     item=`echo $lines | awk -F['>'] '/\<CloudInfo\>/{print $3}' | awk -F['<'] '{print $1}'`
+#     if [ -n "$item" ];then
+#         cloudaddr=$item
+#         break
+#     fi
+# done<$webpath
 
 # Debug Mode
 # netmode="gateway"
@@ -85,15 +94,9 @@ echo "NTP=$cloudaddr" >> $timesyncpath
 #--------------------------------------------
 
 sleep 2s
-while read lines
-do
-    if [ "$lines" == "OK" ];then
-        break
-    fi
-    echo -e "AT\r\n"        > /dev/ttyUSB0
-done < /dev/ttyUSB0
+echo -e "AT^NDISDUP=1,0\r\n" > /dev/ttyUSB0
 
-
+echo -e "AT\r\n"        > /dev/ttyUSB0
 echo -e "ATE0\r\n"      > /dev/ttyUSB0      # Close ECHO
 echo -e "AT^CURC=0\r\n" > /dev/ttyUSB0      # Close part of the initiative to report, such as signal strength of the report
 echo -e "AT^STSF=0\r\n" > /dev/ttyUSB0      # Close the STK's active reporting
@@ -104,10 +107,8 @@ echo -e "AT+CMEE=2\r\n" > /dev/ttyUSB0      # When the error occurs, the details
 if [ "$netmode" == "4G" ];then
     echo -e "AT\r\n"        > /dev/ttyUSB0
     echo -e "AT^LEDCTRL=1\r\n" > /dev/ttyUSB0
-    echo LEDCTRL ON.
 else
     echo -e "AT\r\n"        > /dev/ttyUSB0
     echo -e "AT^LEDCTRL=0\r\n" > /dev/ttyUSB0
-    echo LEDCTRL OFF.
 fi
 

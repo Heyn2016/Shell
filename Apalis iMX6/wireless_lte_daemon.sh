@@ -7,6 +7,7 @@
 #           2017/03/13 V1.0.1[Heyn] Add shell input parameter function
 #           2017/03/16 V1.0.2[heyn] Release
 #           2017/03/17 V1.1.0[heyn] stty -F /dev/ttyUSB0 raw speed 9600 min 0 time 10
+#           2017/03/20 V1.1.1[heyn] New HUAWEI module LEDCTRL ON/OFF
 #
 # systemctl status pboxScript
 #--------------------------------------------
@@ -26,6 +27,7 @@ if [ ! -f "$logfile" ]; then
 fi
 
 if [ `expr match $1 "[S|s][T|t][O|o][P|p]$"` -ne 0 ]; then
+    echo -e "AT^LEDCTRL=0\r\n" > /dev/ttyUSB0
     echo -e "AT^NDISDUP=1,0\r\n" > /dev/ttyUSB0
     echo 4G Status [Offline]: `date '+%Y-%m-%d %H:%M:%S'` >> $logfile
     exit 0
@@ -54,12 +56,13 @@ done < $confpath
 
 if [ "$netmode" == "gateway" ];then
     echo Wired connection...
+    echo -e "AT^LEDCTRL=0\r\n" > /dev/ttyUSB0
     echo `systemctl stop cora.timer`
     exit 0
 fi
 
 echo Wireless connection...
-
+echo -e "AT^LEDCTRL=1\r\n" > /dev/ttyUSB0
 # if [ "$(echo `date '+%H%M'`)" -gt "0700" ]; then
 #     echo "Offline time. [0700 - 2359]" `date '+%Y-%m-%d %H:%M'`
 #     exit 0
@@ -188,6 +191,8 @@ if [ "$(route -n | grep $cloudaddr)" == "" ];then
 fi
 
 echo 4G Status [Online ]: `date '+%Y-%m-%d %H:%M:%S'` >> $logfile
+
+echo -e "AT^LEDCTRL=1\r\n" > /dev/ttyUSB0
 
 # PID=`ps -ef | grep -v grep | grep "cat" | grep "ttyUSB0" | awk '{ print $2; exit }'`
 
