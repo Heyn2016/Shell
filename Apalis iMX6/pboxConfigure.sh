@@ -5,7 +5,8 @@
 #
 # History:  2017/02/22 V1.0.1[Heyn]
 #           2017/03/17 V1.1.0[Heyn] New add AT commands
-#           2017/03/20 V1.1.1[heyn] Offline 4G & Get cloud ip address
+#           2017/03/20 V1.1.1[heyn] Offline 4G & Get cloud ip address method
+#           2017/03/21 V1.1.2[heyn] Bug fix[Removed HUAWEI module cloudaddr is NULL]
 #
 #--------------------------------------------
 
@@ -14,6 +15,7 @@
 #--------------------------------------------
 
 webpath=/www/pages/htdocs/conf/AnyLink.xml
+timesyncpath=/etc/systemd/timesyncd.conf
 confpath=/tmp/pboxConfig
 
 ltemodulename="usb0"
@@ -21,11 +23,14 @@ netmode="gateway"
 cloudaddr="47.93.79.77"
 
 #--------------------------------------------
-# User config end
+# Setting default value
 #--------------------------------------------
 
 echo "netmode="$netmode      >   $confpath
-echo "cloudaddr="$serveraddr >>  $confpath
+echo "cloudaddr="$cloudaddr >>   $confpath
+
+echo "[Time]"           > $timesyncpath
+echo "NTP=$cloudaddr"  >> $timesyncpath
 
 if [ ! -f "$webpath" ]; then
     echo $webpath file is not exist.
@@ -55,6 +60,13 @@ done<$webpath
 #--------------------------------------------
 # Check LTE module
 #--------------------------------------------
+vidpid=$(lsusb | grep 'Huawei' | awk '{print $6}' | awk -F[':'] '{print $1 $2}')
+if [ "$vidpid" != "12d115c1" ];then
+    echo HUAWEI ME909s-821 Module not detected.
+    echo `systemctl stop cora.timer`
+    exit 0
+fi
+
 
 for num  in 0 1 2 3 4
 do
@@ -85,7 +97,6 @@ done
 echo "netmode="$netmode     >   $confpath
 echo "cloudaddr="$cloudaddr >>  $confpath
 
-timesyncpath=/etc/systemd/timesyncd.conf
 echo "[Time]"    > $timesyncpath
 echo "NTP=$cloudaddr" >> $timesyncpath
 
