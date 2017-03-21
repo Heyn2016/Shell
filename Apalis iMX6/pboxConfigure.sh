@@ -60,6 +60,7 @@ for num  in 0 1 2 3 4
 do
     if [ ! -c "/dev/ttyUSB$num" ]; then
         echo HUAWEI LTE Module is not exist.
+        echo `systemctl stop cora.timer`
         exit 0
     fi
 done
