@@ -8,6 +8,7 @@
 #           2017/03/16 V1.0.2[heyn] Release
 #           2017/03/17 V1.1.0[heyn] stty -F /dev/ttyUSB0 raw speed 9600 min 0 time 10
 #           2017/03/20 V1.1.1[heyn] New HUAWEI module LEDCTRL ON/OFF
+#           2017/03/22 V1.2.0[heyn] Modify Query the Connection Status. Changed ttyUSB0 to ttyUSB2
 #
 # systemctl status pboxScript
 #--------------------------------------------
@@ -27,8 +28,8 @@ if [ ! -f "$logfile" ]; then
 fi
 
 if [ `expr match $1 "[S|s][T|t][O|o][P|p]$"` -ne 0 ]; then
-    echo -e "AT^LEDCTRL=0\r\n" > /dev/ttyUSB0
-    echo -e "AT^NDISDUP=1,0\r\n" > /dev/ttyUSB0
+    echo -e "AT^LEDCTRL=0\r\n" > /dev/ttyUSB2
+    echo -e "AT^NDISDUP=1,0\r\n" > /dev/ttyUSB2
     echo 4G Status [Offline]: `date '+%Y-%m-%d %H:%M:%S'` >> $logfile
     exit 0
 fi
@@ -56,43 +57,46 @@ done < $confpath
 
 if [ "$netmode" == "gateway" ];then
     echo Wired connection...
-    echo -e "AT^LEDCTRL=0\r\n" > /dev/ttyUSB0
+    echo -e "AT^LEDCTRL=0\r\n" > /dev/ttyUSB2
     echo `systemctl stop cora.timer`
     exit 0
 fi
 
 echo Wireless connection...
-echo -e "AT^LEDCTRL=1\r\n" > /dev/ttyUSB0
+echo -e "AT\r\n" > /dev/ttyUSB2
+echo -e "AT^LEDCTRL=1\r\n" > /dev/ttyUSB2
+
 # if [ "$(echo `date '+%H%M'`)" -gt "0700" ]; then
 #     echo "Offline time. [0700 - 2359]" `date '+%Y-%m-%d %H:%M'`
 #     exit 0
 # fi
 
-stty -F /dev/ttyUSB0 raw speed 9600 min 0 time 10
-
-echo Check HUAWEI module status...
-echo -e "AT\r\n" > /dev/ttyUSB0
+stty -F /dev/ttyUSB2 raw speed 9600 min 0 time 10
+# stty -F /dev/ttyUSB2 raw min 0 time 10
 
 #--------------------------------------------
 # Query the Connection Status
 # Response:^NDISSTATQRY: 0,,,"IPV4",0,,,"IPV6"
 #--------------------------------------------
 echo Start query connection status...
-echo -e "AT^NDISSTATQRY?\r\n" > /dev/ttyUSB0
-cat /dev/ttyUSB0 > /tmp/huawei
 
-while read lines
+for num  in {0..2}
 do
-    if [[ "$lines" == *"^NDISSTATQRY:"* ]];then
-        res=$(echo $lines | awk '{print $2}' | awk -F[','] '{print $1}')
-        if [ "$res" == "1" ];then
-            echo Net status is online...
-            exit 0
-        else
-            break
+    echo -e "AT^NDISSTATQRY?\r\n" > /dev/ttyUSB2
+    cat /dev/ttyUSB2 > /tmp/huawei
+    res=`cat /tmp/huawei | grep '\^NDISSTATQRY:' | awk '{print $2}' | awk -F[','] '{print $1}'`
+    if [ "$res" == "1" ];then
+        echo Net status is online...
+        exit 0
+    elif [ "$res" == "0" ];then
+        break
+    else
+        echo Retrt query connection status [$num]
+        if [ "$num" == "2" ];then
+            exit -1
         fi
     fi
-done < /tmp/huawei
+done
 
 #--------------------------------------------
 # Query the Connection Status Done
@@ -111,9 +115,9 @@ cgreg_status=(  "Not registered, MT is not currently searching for a new operato
             )
 
 echo Start domain registration status...
-echo -e "AT\r\n" > /dev/ttyUSB0
-echo -e "AT+CGREG?\r\n" > /dev/ttyUSB0
-cat /dev/ttyUSB0 > /tmp/huawei
+echo -e "AT\r\n" > /dev/ttyUSB2
+echo -e "AT+CGREG?\r\n" > /dev/ttyUSB2
+cat /dev/ttyUSB2 > /tmp/huawei
 # Response : +CGREG: 0,1
 while read lines
 do
@@ -150,8 +154,8 @@ sysmode=("NO SERVICE" "GSM" "CDMA" "WCDMA" "TD-SCDMA" "WiMAX" "LTE")
 # [ERROR] ^SYSINFOEX: 1,0,0,4,,3,"WCDMA",41,"WCDMA  
 echo Start detect SIM card...
 
-echo -e "AT^SYSINFOEX\r\n" > /dev/ttyUSB0
-cat /dev/ttyUSB0 > /tmp/huawei
+echo -e "AT^SYSINFOEX\r\n" > /dev/ttyUSB2
+cat /dev/ttyUSB2 > /tmp/huawei
 
 while read lines
 do
@@ -176,8 +180,8 @@ done < /tmp/huawei
 
 echo Start 4G connection...
 
-echo -e "AT\r\n" > /dev/ttyUSB0
-echo -e "AT^NDISDUP=1,1\r\n" > /dev/ttyUSB0
+echo -e "AT\r\n" > /dev/ttyUSB2
+echo -e "AT^NDISDUP=1,1\r\n" > /dev/ttyUSB2
 sleep 2s
 
 # udhcpc -R -n -A 15 -i usb0
@@ -192,9 +196,9 @@ fi
 
 echo 4G Status [Online ]: `date '+%Y-%m-%d %H:%M:%S'` >> $logfile
 
-echo -e "AT^LEDCTRL=1\r\n" > /dev/ttyUSB0
+echo -e "AT^LEDCTRL=1\r\n" > /dev/ttyUSB2
 
-# PID=`ps -ef | grep -v grep | grep "cat" | grep "ttyUSB0" | awk '{ print $2; exit }'`
+# PID=`ps -ef | grep -v grep | grep "cat" | grep "ttyUSB2" | awk '{ print $2; exit }'`
 
 # if test $PID; then
 #         kill -KILL $PID

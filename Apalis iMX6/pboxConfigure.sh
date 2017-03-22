@@ -7,6 +7,7 @@
 #           2017/03/17 V1.1.0[Heyn] New add AT commands
 #           2017/03/20 V1.1.1[heyn] Offline 4G & Get cloud ip address method
 #           2017/03/21 V1.1.2[heyn] Bug fix[Removed HUAWEI module cloudaddr is NULL]
+#           2017/03/22 V1.2.0[heyn] Changed ttyUSB0 to ttyUSB2 & check ttyUSB0 lock status
 #
 #--------------------------------------------
 
@@ -101,26 +102,37 @@ echo "[Time]"    > $timesyncpath
 echo "NTP=$cloudaddr" >> $timesyncpath
 
 #--------------------------------------------
+# New : 2017/03/22
+#--------------------------------------------
+lockUSB0="/var/lock/LCK..ttyUSB0"
+if [ -f "$lockUSB0" ]; then
+    rm /var/lock/LCK..ttyUSB0
+    echo "rm /var/lock/LCK..ttyUSB0"
+fi
+
+
+#--------------------------------------------
 # HUAWEI ME909S
 # New : 2017/03/17
 #--------------------------------------------
 
-sleep 2s
-echo -e "AT^NDISDUP=1,0\r\n" > /dev/ttyUSB0
+sleep 1s
 
-echo -e "AT\r\n"        > /dev/ttyUSB0
-echo -e "ATE0\r\n"      > /dev/ttyUSB0      # Close ECHO
-echo -e "AT^CURC=0\r\n" > /dev/ttyUSB0      # Close part of the initiative to report, such as signal strength of the report
-echo -e "AT^STSF=0\r\n" > /dev/ttyUSB0      # Close the STK's active reporting
-echo -e "ATS0=0\r\n"    > /dev/ttyUSB0      # Turn off auto answer
-echo -e "AT+CGREG=2\r\n" > /dev/ttyUSB0     # Open the PS domain registration status changes when the active reporting function
-echo -e "AT+CMEE=2\r\n" > /dev/ttyUSB0      # When the error occurs, the details are displayed
+echo -e "AT\r\n"        > /dev/ttyUSB2
+
+echo -e "ATE0\r\n"      > /dev/ttyUSB2      # Close ECHO
+echo -e "AT^CURC=0\r\n" > /dev/ttyUSB2      # Close part of the initiative to report, such as signal strength of the report
+echo -e "AT^STSF=0\r\n" > /dev/ttyUSB2      # Close the STK's active reporting
+echo -e "ATS0=0\r\n"    > /dev/ttyUSB2      # Turn off auto answer
+echo -e "AT+CGREG=2\r\n" > /dev/ttyUSB2     # Open the PS domain registration status changes when the active reporting function
+echo -e "AT+CMEE=2\r\n" > /dev/ttyUSB2      # When the error occurs, the details are displayed
 
 if [ "$netmode" == "4G" ];then
-    echo -e "AT\r\n"        > /dev/ttyUSB0
-    echo -e "AT^LEDCTRL=1\r\n" > /dev/ttyUSB0
+    echo -e "AT^LEDCTRL=1\r\n" > /dev/ttyUSB2
 else
-    echo -e "AT\r\n"        > /dev/ttyUSB0
-    echo -e "AT^LEDCTRL=0\r\n" > /dev/ttyUSB0
+    echo -e "AT^LEDCTRL=0\r\n" > /dev/ttyUSB2
 fi
 
+# sleep 1s
+echo -e "AT^NDISDUP=1,0\r\n" > /dev/ttyUSB2
+echo configure.service finished...
