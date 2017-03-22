@@ -37,9 +37,10 @@ WantedBy=multi-user.target
   
 [Unit]  
 Description=Runs Pbox Script every 2 min  
+`After=multi-user.target configure.service`  
   
 [Timer]  
-OnBootSec=10s 
+OnBootSec=12s 
 OnUnitActiveSec=`2min`  
 Unit=`wireless_lte.service`  
   
@@ -61,4 +62,6 @@ RemainAfterExit=yes
 ExecStart=/etc/wireless_lte_daemon.sh stop  
 [Install]  
 WantedBy=reboot.target  
+  
+`$vim systemctl enable huawei-off.service`
   
