@@ -8,11 +8,10 @@
 #           2017/03/20 V1.1.1[heyn] Offline 4G & Get cloud ip address method
 #           2017/03/21 V1.1.2[heyn] Bug fix[Removed HUAWEI module cloudaddr is NULL]
 #           2017/03/22 V1.2.0[heyn] Changed ttyUSB0 to ttyUSB2 & check ttyUSB0 lock status
-#           2017/04/05 V1.2.1[heyn] Bug fix & New add [syslogd] command.
+#           2017/04/05 V1.2.1[heyn] Bug fix
 #
 #--------------------------------------------
 
-syslogd
 
 #--------------------------------------------
 # User config start
