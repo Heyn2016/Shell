@@ -8,6 +8,7 @@
 #           2017/03/20 V1.1.1[heyn] Offline 4G & Get cloud ip address method
 #           2017/03/21 V1.1.2[heyn] Bug fix[Removed HUAWEI module cloudaddr is NULL]
 #           2017/03/22 V1.2.0[heyn] Changed ttyUSB0 to ttyUSB2 & check ttyUSB0 lock status
+#           2017/04/05 V1.2.1[heyn] Bug fix.
 #
 #--------------------------------------------
 
@@ -57,6 +58,14 @@ do
     fi
 done<$webpath
 
+#--------------------------------------------
+# 2017/04/05 V1.2.1 Bug fix [New add]
+#--------------------------------------------
+echo "netmode="$netmode     >   $confpath
+echo "cloudaddr="$cloudaddr >>  $confpath
+
+echo "[Time]"    > $timesyncpath
+echo "NTP=$cloudaddr" >> $timesyncpath
 
 #--------------------------------------------
 # Check LTE module
@@ -78,28 +87,17 @@ do
     fi
 done
 
-#--------------------------------------------
-# Get cloud ip address
-# Delete 2017-03-20
-#--------------------------------------------
-
-# while read lines
-# do
-#     item=`echo $lines | awk -F['>'] '/\<CloudInfo\>/{print $3}' | awk -F['<'] '{print $1}'`
-#     if [ -n "$item" ];then
-#         cloudaddr=$item
-#         break
-#     fi
-# done<$webpath
-
 # Debug Mode
 # netmode="gateway"
 
-echo "netmode="$netmode     >   $confpath
-echo "cloudaddr="$cloudaddr >>  $confpath
+#--------------------------------------------
+# 2017/04/05 V1.2.1 Bug fix [Delete]
+#--------------------------------------------
+# echo "netmode="$netmode     >   $confpath
+# echo "cloudaddr="$cloudaddr >>  $confpath
 
-echo "[Time]"    > $timesyncpath
-echo "NTP=$cloudaddr" >> $timesyncpath
+# echo "[Time]"    > $timesyncpath
+# echo "NTP=$cloudaddr" >> $timesyncpath
 
 #--------------------------------------------
 # New : 2017/03/22
