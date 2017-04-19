@@ -12,12 +12,11 @@
 #
 #--------------------------------------------
 
-
 #--------------------------------------------
 # User config start
 #--------------------------------------------
 
-webpath=/www/pages/htdocs/conf/AnyLink.xml
+webpath=/www/pages/htdocs/conf/Pbox.xml
 timesyncpath=/etc/systemd/timesyncd.conf
 confpath=/tmp/pboxConfig
 
@@ -62,8 +61,8 @@ done<$webpath
 #--------------------------------------------
 # 2017/04/05 V1.2.1 Bug fix [New add]
 #--------------------------------------------
-echo "netmode="$netmode     >   $confpath
-echo "cloudaddr="$cloudaddr >>  $confpath
+echo "netmode="$netmode      >   $confpath
+echo "cloudaddr="$cloudaddr >>   $confpath
 
 echo "[Time]"    > $timesyncpath
 echo "NTP=$cloudaddr" >> $timesyncpath
@@ -82,7 +81,7 @@ fi
 for num  in 0 1 2 3 4
 do
     if [ ! -c "/dev/ttyUSB$num" ]; then
-        echo HUAWEI LTE Module is not exist.
+        echo HUAWEI LTE Module [$num] is not exist.
         echo `systemctl stop cora.timer`
         exit 0
     fi
@@ -103,11 +102,11 @@ done
 #--------------------------------------------
 # New : 2017/03/22
 #--------------------------------------------
-lockUSB0="/var/lock/LCK..ttyUSB0"
-if [ -f "$lockUSB0" ]; then
-    rm /var/lock/LCK..ttyUSB0
-    echo "rm /var/lock/LCK..ttyUSB0"
-fi
+# lockUSB0="/var/lock/LCK..ttyUSB0"
+# if [ -f "$lockUSB0" ]; then
+#     rm /var/lock/LCK..ttyUSB0
+#     echo "rm /var/lock/LCK..ttyUSB0"
+# fi
 
 
 #--------------------------------------------
@@ -116,22 +115,31 @@ fi
 #--------------------------------------------
 
 sleep 1s
+ATDEV=/dev/ttyUSB2
 
-echo -e "AT\r\n"        > /dev/ttyUSB2
+echo -e "AT\r\n"        >> $ATDEV
 
-echo -e "ATE0\r\n"      > /dev/ttyUSB2      # Close ECHO
-echo -e "AT^CURC=0\r\n" > /dev/ttyUSB2      # Close part of the initiative to report, such as signal strength of the report
-echo -e "AT^STSF=0\r\n" > /dev/ttyUSB2      # Close the STK's active reporting
-echo -e "ATS0=0\r\n"    > /dev/ttyUSB2      # Turn off auto answer
-echo -e "AT+CGREG=2\r\n" > /dev/ttyUSB2     # Open the PS domain registration status changes when the active reporting function
-echo -e "AT+CMEE=2\r\n" > /dev/ttyUSB2      # When the error occurs, the details are displayed
+echo -e "ATE0\r\n"      >> $ATDEV      # Close ECHO
+echo -e "AT^CURC=0\r\n" >> $ATDEV      # Close part of the initiative to report, such as signal strength of the report
+echo -e "AT^STSF=0\r\n" >> $ATDEV      # Close the STK's active reporting
+echo -e "ATS0=0\r\n"    >> $ATDEV      # Turn off auto answer
+echo -e "AT+CGREG=2\r\n" >> $ATDEV     # Open the PS domain registration status changes when the active reporting function
+echo -e "AT+CMEE=2\r\n" >> $ATDEV      # When the error occurs, the details are displayed
 
 if [ "$netmode" == "4G" ];then
-    echo -e "AT^LEDCTRL=1\r\n" > /dev/ttyUSB2
+    echo -e "AT^LEDCTRL=1\r\n" >> $ATDEV
 else
-    echo -e "AT^LEDCTRL=0\r\n" > /dev/ttyUSB2
+    echo -e "AT^LEDCTRL=0\r\n" >> $ATDEV
 fi
 
 # sleep 1s
-echo -e "AT^NDISDUP=1,0\r\n" > /dev/ttyUSB2
+echo -e "AT^NDISDUP=1,0\r\n" >> $ATDEV
+stty -F $ATDEV raw speed 9600 min 0 time 10
+
+echo "netmode="$netmode      >   $confpath
+echo "cloudaddr="$cloudaddr >>   $confpath
+
+
+echo "0"                     >   /tmp/dialnum
+
 echo configure.service finished...
