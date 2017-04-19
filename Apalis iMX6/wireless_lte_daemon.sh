@@ -3,17 +3,16 @@
 # Platform: ARM Linux
 # Author:   Heyn
 #
-# History:  2017/03/10 V1.0.0[Heyn]
-#           2017/03/13 V1.0.1[Heyn] Add shell input parameter function
-#           2017/03/16 V1.0.2[heyn] Release
-#           2017/03/17 V1.1.0[heyn] stty -F /dev/ttyUSB0 raw speed 9600 min 0 time 10
-#           2017/03/20 V1.1.1[heyn] New HUAWEI module LEDCTRL ON/OFF
-#           2017/03/22 V1.2.0[heyn] Modify Query the Connection Status. Changed ttyUSB0 to ttyUSB2
-#
-# systemctl status pboxScript
-#--------------------------------------------
+# History:  2017/03/10 V1.0.0 [Heyn] New
+#           2017/03/13 V1.0.1 [Heyn] Add shell input parameter function
+#           2017/03/16 V1.0.2 [Heyn] Release
+#           2017/03/17 V1.1.0 [Heyn] stty -F /dev/ttyUSB0 raw speed 9600 min 0 time 10
+#           2017/03/20 V1.1.1 [Heyn] New HUAWEI module LEDCTRL ON/OFF
+#           2017/03/22 V1.2.0 [Heyn] Modify Query the Connection Status. Changed ttyUSB0 to ttyUSB2
+#           2017/04/19 V1.2.1 [Heyn] Fixed Bug#89 ption1 ttyUSB0: usb_wwan_indat_callback: resubmit read urb failed.
 
-array_ip=("192.168.5.1" "47.93.79.77")
+# systemctl status wireless_lte
+#--------------------------------------------
 
 #--------------------------------------------
 # User config start
@@ -21,15 +20,16 @@ array_ip=("192.168.5.1" "47.93.79.77")
 
 logfile=/tmp/lte_daemon.log
 confpath=/tmp/pboxConfig
-
+dialnum=/tmp/dialnum
+ATDEV=/dev/ttyUSB2
 
 if [ ! -f "$logfile" ]; then
     echo `date '+%Y-%m-%d %H:%M:%S'` >> $logfile
 fi
 
 if [ `expr match $1 "[S|s][T|t][O|o][P|p]$"` -ne 0 ]; then
-    echo -e "AT^LEDCTRL=0\r\n" > /dev/ttyUSB2
-    echo -e "AT^NDISDUP=1,0\r\n" > /dev/ttyUSB2
+    echo -e "AT^LEDCTRL=0\r\n" >> $ATDEV
+    echo -e "AT^NDISDUP=1,0\r\n" >> $ATDEV
     echo 4G Status [Offline]: `date '+%Y-%m-%d %H:%M:%S'` >> $logfile
     exit 0
 fi
@@ -51,28 +51,51 @@ do
         netmode=`echo $lines | awk -F['='] '{print $2}'`
     elif [ "$item" == "cloudaddr" ];then
         cloudaddr=`echo $lines | awk -F['='] '{print $2}'`
+    elif [ "$item" == "init" ];then
+        init=`echo $lines | awk -F['='] '{print $2}'`
     fi
 done < $confpath
 
 
 if [ "$netmode" == "gateway" ];then
     echo Wired connection...
-    echo -e "AT^LEDCTRL=0\r\n" > /dev/ttyUSB2
+    echo -e "AT^LEDCTRL=0\r\n" >> $ATDEV
     echo `systemctl stop cora.timer`
     exit 0
 fi
 
+#--------------------------------------------
+# Check LTE module
+#--------------------------------------------
+vidpid=$(lsusb | grep 'Huawei' | awk '{print $6}' | awk -F[':'] '{print $1 $2}')
+if [ "$vidpid" != "12d115c1" ];then
+    echo HUAWEI ME909s-821 Module not detected.
+    exit 0
+fi
+
+for num  in 0 1 2 3 4
+do
+    if [ ! -c "/dev/ttyUSB$num" ]; then
+        echo HUAWEI LTE Module [$num] is not exist.
+        echo -e `rm -rf /dev/ttyUSB$num`
+        echo -e "AT^RESET\r\n" >> /dev/ttyUSB0
+        exit 0
+    fi
+done
+
+stty -F $ATDEV raw speed 9600 min 0 time 20
+
+echo -e "AT\r\n"        >> $ATDEV
+echo -e "ATE0\r\n"      >> $ATDEV      # Close ECHO
+echo -e "AT^CURC=0\r\n" >> $ATDEV      # Close part of the initiative to report, such as signal strength of the report
+echo -e "AT^STSF=0\r\n" >> $ATDEV      # Close the STK's active reporting
+echo -e "ATS0=0\r\n"    >> $ATDEV      # Turn off auto answer
+echo -e "AT+CGREG=2\r\n" >> $ATDEV     # Open the PS domain registration status changes when the active reporting function
+echo -e "AT+CMEE=2\r\n" >> $ATDEV      # When the error occurs, the details are displayed
+
 echo Wireless connection...
-echo -e "AT\r\n" > /dev/ttyUSB2
-echo -e "AT^LEDCTRL=1\r\n" > /dev/ttyUSB2
-
-# if [ "$(echo `date '+%H%M'`)" -gt "0700" ]; then
-#     echo "Offline time. [0700 - 2359]" `date '+%Y-%m-%d %H:%M'`
-#     exit 0
-# fi
-
-stty -F /dev/ttyUSB2 raw speed 9600 min 0 time 10
-# stty -F /dev/ttyUSB2 raw min 0 time 10
+# echo -e "AT\r\n" >> $ATDEV
+# echo -e "AT^LEDCTRL=1\r\n" >> $ATDEV
 
 #--------------------------------------------
 # Query the Connection Status
@@ -82,10 +105,11 @@ echo Start query connection status...
 
 for num  in {0..2}
 do
-    echo -e "AT^NDISSTATQRY?\r\n" > /dev/ttyUSB2
-    cat /dev/ttyUSB2 > /tmp/huawei
+    echo -e "AT\r\n" >> $ATDEV; echo -e "AT^NDISSTATQRY?\r\n" >> $ATDEV ; cat $ATDEV > /tmp/huawei
+
     res=`cat /tmp/huawei | grep '\^NDISSTATQRY:' | awk '{print $2}' | awk -F[','] '{print $1}'`
     if [ "$res" == "1" ];then
+        echo "0"   >   $dialnum
         echo Net status is online...
         exit 0
     elif [ "$res" == "0" ];then
@@ -98,10 +122,29 @@ do
     fi
 done
 
+
+    # echo -e "AT\r\n" > $ATDEV; echo -e "AT^NDISSTATQRY?\r\n" > $ATDEV
+    # while read lines
+    # do
+    #     if [[ "$lines" == *"^NDISSTATQRY:"* ]]; then
+    #         res=$(echo $lines | awk '{print $2}' | awk -F[','] '{print $1}')
+    #         if [ "$res" == "1" ];then
+    #             echo Net status is online...
+    #             exit 0
+    #         elif [ "$res" == "0" ];then
+    #             break
+    #         else
+    #             echo Retrt query connection status.
+    #             exit -1
+    #         fi
+    #     fi
+    # done < $ATDEV
+
 #--------------------------------------------
 # Query the Connection Status Done
 #--------------------------------------------
 
+echo -e "AT^NDISDUP=1,0\r\n" >> $ATDEV
 
 #--------------------------------------------
 # Query Domain Registration Status
@@ -114,10 +157,10 @@ cgreg_status=(  "Not registered, MT is not currently searching for a new operato
                 "Registered, roaming" 
             )
 
+
+
 echo Start domain registration status...
-echo -e "AT\r\n" > /dev/ttyUSB2
-echo -e "AT+CGREG?\r\n" > /dev/ttyUSB2
-cat /dev/ttyUSB2 > /tmp/huawei
+echo -e "AT\r\n" >> $ATDEV ; echo -e "AT+CGREG?\r\n" >> $ATDEV ; cat $ATDEV > /tmp/huawei
 # Response : +CGREG: 0,1
 while read lines
 do
@@ -154,8 +197,8 @@ sysmode=("NO SERVICE" "GSM" "CDMA" "WCDMA" "TD-SCDMA" "WiMAX" "LTE")
 # [ERROR] ^SYSINFOEX: 1,0,0,4,,3,"WCDMA",41,"WCDMA  
 echo Start detect SIM card...
 
-echo -e "AT^SYSINFOEX\r\n" > /dev/ttyUSB2
-cat /dev/ttyUSB2 > /tmp/huawei
+echo -e "AT^SYSINFOEX\r\n" >> $ATDEV
+cat $ATDEV >> /tmp/huawei
 
 while read lines
 do
@@ -180,8 +223,20 @@ done < /tmp/huawei
 
 echo Start 4G connection...
 
-echo -e "AT\r\n" > /dev/ttyUSB2
-echo -e "AT^NDISDUP=1,1\r\n" > /dev/ttyUSB2
+echo -e "AT\r\n" >> $ATDEV
+echo -e "AT^NDISDUP=1,1\r\n" >> $ATDEV
+
+#--------------------------------------------
+count=$(cat $dialnum)
+count=$(($count+1))
+if [ "$count" -ge 3 ]; then
+    echo "0"   >   $dialnum
+    echo -e "AT^RESET\r\n" >> /dev/ttyUSB0
+    exit 0
+fi
+echo $count   >   $dialnum
+#--------------------------------------------
+
 sleep 2s
 
 # udhcpc -R -n -A 15 -i usb0
@@ -196,18 +251,4 @@ fi
 
 echo 4G Status [Online ]: `date '+%Y-%m-%d %H:%M:%S'` >> $logfile
 
-echo -e "AT^LEDCTRL=1\r\n" > /dev/ttyUSB2
-
-# PID=`ps -ef | grep -v grep | grep "cat" | grep "ttyUSB2" | awk '{ print $2; exit }'`
-
-# if test $PID; then
-#         kill -KILL $PID
-
-#         if [ ! "$?" = "0" ]; then
-#                 echo "ERROR: Terminated failed"
-#                 exit 3
-#         fi
-
-#         echo "link terminated"
-#         exit 0
-# fi
+echo -e "AT^LEDCTRL=1\r\n" >> $ATDEV
