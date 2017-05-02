@@ -3,12 +3,13 @@
 # Platform: ARM Linux
 # Author:   Heyn
 #
-# History:  2017/02/22 V1.0.1[Heyn]
-#           2017/03/17 V1.1.0[Heyn] New add AT commands
-#           2017/03/20 V1.1.1[heyn] Offline 4G & Get cloud ip address method
-#           2017/03/21 V1.1.2[heyn] Bug fix[Removed HUAWEI module cloudaddr is NULL]
-#           2017/03/22 V1.2.0[heyn] Changed ttyUSB0 to ttyUSB2 & check ttyUSB0 lock status
-#           2017/04/05 V1.2.1[heyn] Bug fix
+# History:  2017/02/22 V1.0.1 [Heyn]
+#           2017/03/17 V1.1.0 [Heyn] New add AT commands
+#           2017/03/20 V1.1.1 [Heyn] Offline 4G & Get cloud ip address method
+#           2017/03/21 V1.1.2 [Heyn] Bug fix[Removed HUAWEI module cloudaddr is NULL]
+#           2017/03/22 V1.2.0 [Heyn] Changed ttyUSB0 to ttyUSB2 & check ttyUSB0 lock status
+#           2017/04/05 V1.2.1 [Heyn] Bug fix
+#           2017/04/19 V1.2.2 [Heyn] Fixed Bug#89 ption1 ttyUSB0: usb_wwan_indat_callback: resubmit read urb failed.
 #
 #--------------------------------------------
 
@@ -91,25 +92,6 @@ done
 # netmode="gateway"
 
 #--------------------------------------------
-# 2017/04/05 V1.2.1 Bug fix [Delete]
-#--------------------------------------------
-# echo "netmode="$netmode     >   $confpath
-# echo "cloudaddr="$cloudaddr >>  $confpath
-
-# echo "[Time]"    > $timesyncpath
-# echo "NTP=$cloudaddr" >> $timesyncpath
-
-#--------------------------------------------
-# New : 2017/03/22
-#--------------------------------------------
-# lockUSB0="/var/lock/LCK..ttyUSB0"
-# if [ -f "$lockUSB0" ]; then
-#     rm /var/lock/LCK..ttyUSB0
-#     echo "rm /var/lock/LCK..ttyUSB0"
-# fi
-
-
-#--------------------------------------------
 # HUAWEI ME909S
 # New : 2017/03/17
 #--------------------------------------------
@@ -134,12 +116,10 @@ fi
 
 # sleep 1s
 echo -e "AT^NDISDUP=1,0\r\n" >> $ATDEV
-stty -F $ATDEV raw speed 9600 min 0 time 10
+stty -F $ATDEV raw speed 9600 min 0 time 20
 
 echo "netmode="$netmode      >   $confpath
 echo "cloudaddr="$cloudaddr >>   $confpath
-
-
 echo "0"                     >   /tmp/dialnum
 
 echo configure.service finished...
