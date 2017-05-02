@@ -18,24 +18,29 @@
 # User config start
 #--------------------------------------------
 
-logfile=/tmp/lte_daemon.log
+ltelogs=/tmp/modulelogs
 confpath=/tmp/pboxConfig
 dialnum=/tmp/dialnum
-ATDEV=/dev/ttyUSB2
+atport=/dev/ttyUSB2
 
-if [ ! -f "$logfile" ]; then
-    echo `date '+%Y-%m-%d %H:%M:%S'` >> $logfile
+#--------------------------------------------
+# Check if the log file exists
+#--------------------------------------------
+if [ ! -f "$ltelogs" ]; then
+    echo `date '+%Y-%m-%d %H:%M:%S'` > $ltelogs
 fi
 
 if [ `expr match $1 "[S|s][T|t][O|o][P|p]$"` -ne 0 ]; then
-    echo -e "AT^LEDCTRL=0\r\n" >> $ATDEV
-    echo -e "AT^NDISDUP=1,0\r\n" >> $ATDEV
-    echo 4G Status [Offline]: `date '+%Y-%m-%d %H:%M:%S'` >> $logfile
+    echo -e "AT^LEDCTRL=0\r\n"   >> $atport ; echo -e "AT^NDISDUP=1,0\r\n" >> $atport
+    echo 4G Status [Offline]: `date '+%Y-%m-%d %H:%M:%S'` >> $ltelogs
     exit 0
 fi
 
+#--------------------------------------------
+# Check if the pbox configure file exists
+#--------------------------------------------
 if [ ! -f "$confpath" ]; then
-    echo $confpath file is not exist. > $logfile
+    echo $confpath file is not exist. > $ltelogs ; echo `systemctl stop cora.timer`
     exit 0
 fi
 
@@ -43,6 +48,7 @@ fi
 # Get network mode
 #--------------------------------------------
 netmode="gateway"
+cloudaddr="47.93.79.77"
 
 while read lines
 do
@@ -51,16 +57,12 @@ do
         netmode=`echo $lines | awk -F['='] '{print $2}'`
     elif [ "$item" == "cloudaddr" ];then
         cloudaddr=`echo $lines | awk -F['='] '{print $2}'`
-    elif [ "$item" == "init" ];then
-        init=`echo $lines | awk -F['='] '{print $2}'`
     fi
 done < $confpath
 
-
-if [ "$netmode" == "gateway" ];then
+if [ "$netmode" == "gateway" ]; then
     echo Wired connection...
-    echo -e "AT^LEDCTRL=0\r\n" >> $ATDEV
-    echo `systemctl stop cora.timer`
+    echo -e "AT^LEDCTRL=0\r\n" >> $atport ; echo `systemctl stop cora.timer`
     exit 0
 fi
 
@@ -68,34 +70,32 @@ fi
 # Check LTE module
 #--------------------------------------------
 vidpid=$(lsusb | grep 'Huawei' | awk '{print $6}' | awk -F[':'] '{print $1 $2}')
-if [ "$vidpid" != "12d115c1" ];then
-    echo HUAWEI ME909s-821 Module not detected.
+if [ "$vidpid" != "12d115c1" ]; then
+    echo `date '+%Y-%m-%d %H:%M:%S'` HUAWEI ME909s-821 Module not detected. >> $ltelogs
     exit 0
 fi
 
 for num  in 0 1 2 3 4
 do
     if [ ! -c "/dev/ttyUSB$num" ]; then
-        echo HUAWEI LTE Module [$num] is not exist.
-        echo -e `rm -rf /dev/ttyUSB$num`
-        echo -e "AT^RESET\r\n" >> /dev/ttyUSB0
+        echo `date '+%Y-%m-%d %H:%M:%S'` HUAWEI LTE Module [$num] is not exist. >> $ltelogs
+        echo -e `rm -rf /dev/ttyUSB$num` ; echo -e "AT^RESET\r\n" >> /dev/ttyUSB0
         exit 0
     fi
 done
 
-stty -F $ATDEV raw speed 9600 min 0 time 20
-
-echo -e "AT\r\n"        >> $ATDEV
-echo -e "ATE0\r\n"      >> $ATDEV      # Close ECHO
-echo -e "AT^CURC=0\r\n" >> $ATDEV      # Close part of the initiative to report, such as signal strength of the report
-echo -e "AT^STSF=0\r\n" >> $ATDEV      # Close the STK's active reporting
-echo -e "ATS0=0\r\n"    >> $ATDEV      # Turn off auto answer
-echo -e "AT+CGREG=2\r\n" >> $ATDEV     # Open the PS domain registration status changes when the active reporting function
-echo -e "AT+CMEE=2\r\n" >> $ATDEV      # When the error occurs, the details are displayed
-
 echo Wireless connection...
-# echo -e "AT\r\n" >> $ATDEV
-# echo -e "AT^LEDCTRL=1\r\n" >> $ATDEV
+stty -F $atport raw speed 9600 min 0 time 20
+
+echo -e "AT\r\n"         >> $atport
+echo -e "ATE0\r\n"       >> $atport      # Close ECHO
+echo -e "AT^CURC=0\r\n"  >> $atport      # Close part of the initiative to report, such as signal strength of the report
+echo -e "AT^STSF=0\r\n"  >> $atport      # Close the STK's active reporting
+echo -e "ATS0=0\r\n"     >> $atport      # Turn off auto answer
+echo -e "AT+CGREG=2\r\n" >> $atport      # Open the PS domain registration status changes when the active reporting function
+echo -e "AT+CMEE=2\r\n"  >> $atport      # When the error occurs, the details are displayed
+
+# echo -e "AT^LEDCTRL=1\r\n" >> $atport
 
 #--------------------------------------------
 # Query the Connection Status
@@ -105,46 +105,59 @@ echo Start query connection status...
 
 for num  in {0..2}
 do
-    echo -e "AT\r\n" >> $ATDEV; echo -e "AT^NDISSTATQRY?\r\n" >> $ATDEV ; cat $ATDEV > /tmp/huawei
-
+    echo -e "AT\r\n" >> $atport ; echo -e "AT^NDISSTATQRY?\r\n" >> $atport ; cat $atport > /tmp/huawei
     res=`cat /tmp/huawei | grep '\^NDISSTATQRY:' | awk '{print $2}' | awk -F[','] '{print $1}'`
-    if [ "$res" == "1" ];then
+    if [ "$res" == "1" ]; then
         echo "0"   >   $dialnum
         echo Net status is online...
         exit 0
-    elif [ "$res" == "0" ];then
+    elif [ "$res" == "0" ]; then
         break
     else
         echo Retrt query connection status [$num]
-        if [ "$num" == "2" ];then
+        if [ "$num" == "2" ]; then
             exit -1
         fi
     fi
 done
 
+# for num  in {0..2}
+# do
+#     loopnum=0
+#     echo -e "AT\r\n" > $atport; echo -e "AT^NDISSTATQRY?\r\n" > $atport
+#     while read lines
+#     do
+#         if [[ "$lines" == *"^NDISSTATQRY:"* ]]; then
+#             res=$(echo $lines | awk '{print $2}' | awk -F[','] '{print $1}')
+#             if [ "$res" == "1" ]; then
+#                 echo Net status is online...[$num]
+#                 exit 0
+#             elif [ "$res" == "0" ]; then
+#                 break
+#             else
+#                 echo Retrt query connection status.
+#                 exit -1
+#             fi
+#         fi
 
-    # echo -e "AT\r\n" > $ATDEV; echo -e "AT^NDISSTATQRY?\r\n" > $ATDEV
-    # while read lines
-    # do
-    #     if [[ "$lines" == *"^NDISSTATQRY:"* ]]; then
-    #         res=$(echo $lines | awk '{print $2}' | awk -F[','] '{print $1}')
-    #         if [ "$res" == "1" ];then
-    #             echo Net status is online...
-    #             exit 0
-    #         elif [ "$res" == "0" ];then
-    #             break
-    #         else
-    #             echo Retrt query connection status.
-    #             exit -1
-    #         fi
-    #     fi
-    # done < $ATDEV
+#         # Exception
+#         loopnum=$(($loopnum+1))
+#         if [ "$loopnum" -ge 100 ]; then
+#             echo `date '+%Y-%m-%d %H:%M:%S'` HUAWEI ME909s-821 Module exception. >> $ltelogs
+#             echo -e "AT^RESET\r\n" >> /dev/ttyUSB0
+#             exit 0
+#         fi
+#     done < $atport
+
+#     # It's offline status.
+#     if [ "$res" == "0" ]; then
+#         break
+#     fi
+# done
 
 #--------------------------------------------
 # Query the Connection Status Done
 #--------------------------------------------
-
-echo -e "AT^NDISDUP=1,0\r\n" >> $ATDEV
 
 #--------------------------------------------
 # Query Domain Registration Status
@@ -155,28 +168,23 @@ cgreg_status=(  "Not registered, MT is not currently searching for a new operato
                 "Registration denied" 
                 "Unknown" 
                 "Registered, roaming" 
-            )
-
-
+             )
 
 echo Start domain registration status...
-echo -e "AT\r\n" >> $ATDEV ; echo -e "AT+CGREG?\r\n" >> $ATDEV ; cat $ATDEV > /tmp/huawei
+echo -e "AT\r\n" >> $atport ; echo -e "AT+CGREG?\r\n" >> $atport ; cat $atport > /tmp/huawei
 # Response : +CGREG: 0,1
 while read lines
 do
-    if [[ "$lines" == *"CGREG"* ]];then
+    if [[ "$lines" == *"CGREG"* ]]; then
         res=$(echo $lines | awk '{print $2}' | awk -F[','] '{print $2}')
-        
-        if [ "$res" == "1" ] || [ "$res" == "5" ];then
-            echo $lines
+        if [ "$res" == "1" ] || [ "$res" == "5" ]; then
             echo ${cgreg_status[$res]}
             break
-        elif [ "$res" == "0" ] || [ "$res" == "2" ] || [ "$res" == "3" ];then
-            echo ${cgreg_status[$res]} >> $logfile
-            sleep 1s
+        elif [ "$res" == "0" ] || [ "$res" == "2" ] || [ "$res" == "3" ]; then
+            echo `date '+%Y-%m-%d %H:%M:%S'` ${cgreg_status[$res]} >> $ltelogs
+            exit 1
         else
-            # cgreg_status = Unknown
-            echo Unknown >> $logfile
+            echo `date '+%Y-%m-%d %H:%M:%S'` >> $ltelogs
             exit 1
         fi
     fi
@@ -196,9 +204,7 @@ sysmode=("NO SERVICE" "GSM" "CDMA" "WCDMA" "TD-SCDMA" "WiMAX" "LTE")
 
 # [ERROR] ^SYSINFOEX: 1,0,0,4,,3,"WCDMA",41,"WCDMA  
 echo Start detect SIM card...
-
-echo -e "AT^SYSINFOEX\r\n" >> $ATDEV
-cat $ATDEV >> /tmp/huawei
+echo -e "AT^SYSINFOEX\r\n" >> $atport ; cat $atport >> /tmp/huawei
 
 while read lines
 do
@@ -223,8 +229,7 @@ done < /tmp/huawei
 
 echo Start 4G connection...
 
-echo -e "AT\r\n" >> $ATDEV
-echo -e "AT^NDISDUP=1,1\r\n" >> $ATDEV
+echo -e "AT\r\n" >> $atport ; echo -e "AT^NDISDUP=1,1\r\n" >> $atport
 
 #--------------------------------------------
 count=$(cat $dialnum)
@@ -238,17 +243,12 @@ echo $count   >   $dialnum
 #--------------------------------------------
 
 sleep 2s
-
-# udhcpc -R -n -A 15 -i usb0
 udhcpc -n -i usb0
-
 
 # Get cloud ip address
 if [ "$(route -n | grep $cloudaddr)" == "" ];then
-    # echo Cloud IP Address = $cloudaddr >> $logfile
     route add -net $cloudaddr netmask 255.255.255.255 dev usb0
 fi
 
-echo 4G Status [Online ]: `date '+%Y-%m-%d %H:%M:%S'` >> $logfile
-
-echo -e "AT^LEDCTRL=1\r\n" >> $ATDEV
+echo -e "AT^LEDCTRL=1\r\n" >> $atport
+echo 4G Status [Online ]: `date '+%Y-%m-%d %H:%M:%S'` >> $ltelogs
