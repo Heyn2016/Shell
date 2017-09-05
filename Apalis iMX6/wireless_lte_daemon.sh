@@ -10,7 +10,8 @@
 #           2017/03/20 V1.1.1 [Heyn] New HUAWEI module LEDCTRL ON/OFF
 #           2017/03/22 V1.2.0 [Heyn] Modify Query the Connection Status. Changed ttyUSB0 to ttyUSB2
 #           2017/04/19 V1.2.1 [Heyn] Fixed Bug#89 ption1 ttyUSB0: usb_wwan_indat_callback: resubmit read urb failed.
-
+#           2017/05/25 V1.2.2 [Heyn] Optimized code.
+#
 # systemctl status wireless_lte
 #--------------------------------------------
 
@@ -23,17 +24,22 @@ confpath=/tmp/pboxConfig
 dialnum=/tmp/dialnum
 atport=/dev/ttyUSB2
 
+
 #--------------------------------------------
 # Check if the log file exists
 #--------------------------------------------
 if [ ! -f "$ltelogs" ]; then
-    echo `date '+%Y-%m-%d %H:%M:%S'` > $ltelogs
+    echo 4G Status [PowerOn]: `date '+%Y-%m-%d %H:%M:%S'` > $ltelogs
 fi
 
-if [ `expr match $1 "[S|s][T|t][O|o][P|p]$"` -ne 0 ]; then
+if [ $# == 1 ] && [ `expr match $1 "[S|s][T|t][O|o][P|p]$"` -ne 0 ]; then
     echo -e "AT^LEDCTRL=0\r\n"   >> $atport ; echo -e "AT^NDISDUP=1,0\r\n" >> $atport
     echo 4G Status [Offline]: `date '+%Y-%m-%d %H:%M:%S'` >> $ltelogs
     exit 0
+elif [ $# == 1 ] && [ `expr match $1 "[S|s][T|t][A|a][R|r][T|t]$"` -ne 0 ]; then
+    echo [Step 0] `date '+%Y-%m-%d %H:%M:%S'`
+else
+    echo "Input param error. [stop or start]" ; exit 0
 fi
 
 #--------------------------------------------
@@ -53,12 +59,13 @@ cloudaddr="47.93.79.77"
 while read lines
 do
     item=`echo $lines | awk -F['='] '{print $1}'`
-    if [ "$item" == "netmode" ];then
+    if [ "$item" == "netmode" ]; then
         netmode=`echo $lines | awk -F['='] '{print $2}'`
-    elif [ "$item" == "cloudaddr" ];then
+    elif [ "$item" == "cloudaddr" ]; then
         cloudaddr=`echo $lines | awk -F['='] '{print $2}'`
     fi
 done < $confpath
+
 
 if [ "$netmode" == "gateway" ]; then
     echo Wired connection...
@@ -68,34 +75,48 @@ fi
 
 #--------------------------------------------
 # Check LTE module
+# 2017/05/25 V1.2.2 [Heyn] Optimized code.
 #--------------------------------------------
-vidpid=$(lsusb | grep 'Huawei' | awk '{print $6}' | awk -F[':'] '{print $1 $2}')
-if [ "$vidpid" != "12d115c1" ]; then
+
+if [ $(lsusb | grep 'Huawei' | awk '{print $6}' | awk -F[':'] '{print $1 $2}') != "12d115c1" ]; then
     echo `date '+%Y-%m-%d %H:%M:%S'` HUAWEI ME909s-821 Module not detected. >> $ltelogs
     exit 0
-fi
+else
+    portArray=()
+    index=0
+    for port  in `ls /dev/ttyUSB*`
+    do
+        if [ ! -c $port ]; then
+            echo `date '+%Y-%m-%d %H:%M:%S'` HUAWEI LTE Module [$port] not exist. >> $ltelogs
+            echo -e `rm -rf $port`
+        else
+            stty -F $port raw min 0 time 5 ; echo -e "ATE0\r\n" >> $port 
+            if [[ `cat $port` == *"OK"* ]]; then
+                portArray[index]=$port ; index=$(($index+1))
+            fi
+        fi
+    done
 
-for num  in 0 1 2 3 4
-do
-    if [ ! -c "/dev/ttyUSB$num" ]; then
-        echo `date '+%Y-%m-%d %H:%M:%S'` HUAWEI LTE Module [$num] is not exist. >> $ltelogs
-        echo -e `rm -rf /dev/ttyUSB$num` ; echo -e "AT^RESET\r\n" >> /dev/ttyUSB0
+    if [ ${#portArray[*]} > 0 ]; then
+        atport=${portArray[${#portArray[*]}-1]}
+    else
+        echo `date '+%Y-%m-%d %H:%M:%S'` HUAWEI LTE Module [$port] not detected. >> $ltelogs
         exit 0
     fi
-done
+fi
 
-echo Wireless connection...
-stty -F $atport raw speed 9600 min 0 time 20
+echo [Step 1] `date '+%Y-%m-%d %H:%M:%S'`
 
-echo -e "AT\r\n"         >> $atport
-echo -e "ATE0\r\n"       >> $atport      # Close ECHO
-echo -e "AT^CURC=0\r\n"  >> $atport      # Close part of the initiative to report, such as signal strength of the report
-echo -e "AT^STSF=0\r\n"  >> $atport      # Close the STK's active reporting
-echo -e "ATS0=0\r\n"     >> $atport      # Turn off auto answer
-echo -e "AT+CGREG=2\r\n" >> $atport      # Open the PS domain registration status changes when the active reporting function
-echo -e "AT+CMEE=2\r\n"  >> $atport      # When the error occurs, the details are displayed
+echo Wireless connection on $atport
+# stty -F $atport raw min 0 time 10
 
-# echo -e "AT^LEDCTRL=1\r\n" >> $atport
+# echo -e "AT\r\n"         >> $atport | cat $atport > /dev/null
+# echo -e "ATE0\r\n"       >> $atport | cat $atport > /dev/null     # Close ECHO
+# echo -e "AT^CURC=0\r\n"  >> $atport | cat $atport > /dev/null     # Close part of the initiative to report, such as signal strength of the report
+# echo -e "AT^STSF=0\r\n"  >> $atport | cat $atport > /dev/null     # Close the STK's active reporting
+# echo -e "ATS0=0\r\n"     >> $atport | cat $atport > /dev/null     # Turn off auto answer
+# echo -e "AT+CGREG=2\r\n" >> $atport | cat $atport > /dev/null     # Open the PS domain registration status changes when the active reporting function
+# echo -e "AT+CMEE=2\r\n"  >> $atport | cat $atport > /dev/null     # When the error occurs, the details are displayed
 
 #--------------------------------------------
 # Query the Connection Status
@@ -103,10 +124,11 @@ echo -e "AT+CMEE=2\r\n"  >> $atport      # When the error occurs, the details ar
 #--------------------------------------------
 echo Start query connection status...
 
-for num  in {0..2}
+for loopnum  in {0..2}
 do
-    echo -e "AT\r\n" >> $atport ; echo -e "AT^NDISSTATQRY?\r\n" >> $atport ; cat $atport > /tmp/huawei
-    res=`cat /tmp/huawei | grep '\^NDISSTATQRY:' | awk '{print $2}' | awk -F[','] '{print $1}'`
+    res="255"
+    echo -e "AT^NDISSTATQRY?\r\n" >> $atport
+    res=$(echo `cat $atport | grep NDISSTATQRY: | awk '{print $2}' | awk -F[','] '{print $1}'`)
     if [ "$res" == "1" ]; then
         echo "0"   >   $dialnum
         echo Net status is online...
@@ -114,12 +136,14 @@ do
     elif [ "$res" == "0" ]; then
         break
     else
-        echo Retrt query connection status [$num]
-        if [ "$num" == "2" ]; then
+        echo Retrt query connection status [$loopnum]
+        if [ "$loopnum" == "2" ]; then
             exit -1
         fi
     fi
 done
+
+echo [Step 2] `date '+%Y-%m-%d %H:%M:%S'`
 
 # for num  in {0..2}
 # do
